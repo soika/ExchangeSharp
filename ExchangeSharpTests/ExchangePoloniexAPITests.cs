@@ -30,9 +30,13 @@ namespace ExchangeSharpTests
     [TestClass]
     public sealed class ExchangePoloniexAPITests
     {
-        private static ExchangePoloniexAPI CreateAPI()
+        private static ExchangePoloniexAPI CreatePoloniexAPI(string response = null)
         {
-            var requestMaker = Substitute.For<IAPIRequestMaker>();
+            var requestMaker = new MockAPIRequestMaker();
+            if (response != null)
+            {
+                requestMaker.GlobalResponse = response;
+            }
             var polo = new ExchangePoloniexAPI { RequestMaker = requestMaker };
             return polo;
         }
@@ -53,12 +57,12 @@ namespace ExchangeSharpTests
 }";
 
             var singleOrder = JsonConvert.DeserializeObject<JToken>(BuyOrder);
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             ExchangeOrderResult order = polo.ParsePlacedOrder(singleOrder);
             order.OrderId.Should().Be("31226040");
             order.IsBuy.Should().BeTrue();
             order.Amount.Should().Be(338.8732m);
-            order.OrderDate.Should().Be(new DateTime(2014, 10, 18, 23, 03, 21));
+            order.OrderDate.Should().Be(new DateTime(2014, 10, 18, 23, 3, 21, DateTimeKind.Utc));
             order.AveragePrice.Should().Be(0.00000173m);
             order.AmountFilled.Should().Be(338.8732m);
             order.FeesCurrency.Should().BeNullOrEmpty();
@@ -81,12 +85,12 @@ namespace ExchangeSharpTests
 }";
 
             var singleOrder = JsonConvert.DeserializeObject<JToken>(SellOrder);
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             ExchangeOrderResult order = polo.ParsePlacedOrder(singleOrder);
             order.OrderId.Should().Be("31226040");
             order.IsBuy.Should().BeFalse();
             order.Amount.Should().Be(338.8732m);
-            order.OrderDate.Should().Be(new DateTime(2014, 10, 18, 23, 03, 21));
+            order.OrderDate.Should().Be(new DateTime(2014, 10, 18, 23, 3, 21));
             order.AveragePrice.Should().Be(0.00000173m);
             order.AmountFilled.Should().Be(338.8732m);
             order.FeesCurrency.Should().BeNullOrEmpty();
@@ -98,7 +102,7 @@ namespace ExchangeSharpTests
         {
             var order = new ExchangeOrderResult();
             var orderWithMultipleTrades = JsonConvert.DeserializeObject<JToken>(ReturnOrderTradesSell);
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             polo.ParseOrderTrades(orderWithMultipleTrades, order);
             order.Amount.Should().Be(143.14m);
             order.AmountFilled.Should().Be(order.Amount);
@@ -116,7 +120,7 @@ namespace ExchangeSharpTests
         {
             var order = new ExchangeOrderResult();
             var orderWithMultipleTrades = JsonConvert.DeserializeObject<JToken>(ReturnOrderTrades_SimpleBuy);
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             polo.ParseOrderTrades(orderWithMultipleTrades, order);
             order.OrderId.Should().BeNullOrEmpty();
             order.Amount.Should().Be(19096.46996880m);
@@ -134,7 +138,7 @@ namespace ExchangeSharpTests
         {
             var order = new ExchangeOrderResult();
             var orderWithMultipleTrades = JsonConvert.DeserializeObject<JToken>(ReturnOrderTrades_GasBuy);
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             polo.ParseOrderTrades(orderWithMultipleTrades, order);
             order.AveragePrice.Should().Be(0.0397199908083616777777777778m);
             order.IsBuy.Should().BeTrue();
@@ -156,7 +160,7 @@ namespace ExchangeSharpTests
             ""amount"": ""100"",
             ""total"": ""4""
         }]";
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             var marketOrders = JsonConvert.DeserializeObject<JToken>(marketOrdersJson);
 
             var orders = new List<ExchangeOrderResult>();
@@ -178,14 +182,14 @@ namespace ExchangeSharpTests
         [TestMethod]
         public void ReturnOpenOrders_Unfilled_IsCorrect()
         {
-            var polo = CreateAPI();
+            var polo = CreatePoloniexAPI();
             var marketOrders = JsonConvert.DeserializeObject<JToken>(Unfilled);
             ExchangeOrderResult order = polo.ParseOpenOrder(marketOrders[0]);
             order.OrderId.Should().Be("35329211614");
             order.IsBuy.Should().BeTrue();
             order.AmountFilled.Should().Be(0);
             order.Amount.Should().Be(0.01m);
-            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45));
+            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45, DateTimeKind.Utc));
             order.Fees.Should().Be(0);
             order.FeesCurrency.Should().BeNullOrEmpty();
             order.Result.Should().Be(ExchangeAPIOrderResult.Pending);
@@ -194,16 +198,15 @@ namespace ExchangeSharpTests
         [TestMethod]
         public void GetOpenOrderDetails_Unfilled_IsCorrect()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(Unfilled);
+            var polo = CreatePoloniexAPI(Unfilled);
 
-            IEnumerable<ExchangeOrderResult> orders = polo.GetOpenOrderDetails("ETH_BCH");
+            IEnumerable<ExchangeOrderResult> orders = polo.GetOpenOrderDetailsAsync("ETH_BCH").Sync();
             ExchangeOrderResult order = orders.Single();
             order.OrderId.Should().Be("35329211614");
             order.IsBuy.Should().BeTrue();
             order.AmountFilled.Should().Be(0);
             order.Amount.Should().Be(0.01m);
-            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45));
+            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45, DateTimeKind.Utc));
             order.Fees.Should().Be(0);
             order.FeesCurrency.Should().BeNullOrEmpty();
             order.Result.Should().Be(ExchangeAPIOrderResult.Pending);
@@ -212,16 +215,15 @@ namespace ExchangeSharpTests
         [TestMethod]
         public void GetOpenOrderDetails_AllUnfilled_IsCorrect()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(AllUnfilledOrders);
+            var polo = CreatePoloniexAPI(AllUnfilledOrders);
 
-            IEnumerable<ExchangeOrderResult> orders = polo.GetOpenOrderDetails(); // all
+            IEnumerable<ExchangeOrderResult> orders = polo.GetOpenOrderDetailsAsync().Sync(); // all
             ExchangeOrderResult order = orders.Single();
             order.OrderId.Should().Be("35329211614");
             order.IsBuy.Should().BeTrue();
             order.AmountFilled.Should().Be(0);
             order.Amount.Should().Be(0.01m);
-            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45));
+            order.OrderDate.Should().Be(new DateTime(2018, 4, 6, 1, 3, 45, DateTimeKind.Utc));
             order.Fees.Should().Be(0);
             order.FeesCurrency.Should().BeNullOrEmpty();
             order.Result.Should().Be(ExchangeAPIOrderResult.Pending);
@@ -230,9 +232,8 @@ namespace ExchangeSharpTests
         [TestMethod]
         public void GetOrderDetails_HappyPath()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(ReturnOrderTrades_SimpleBuy);
-            ExchangeOrderResult order = polo.GetOrderDetails("1");
+            var polo = CreatePoloniexAPI(ReturnOrderTrades_SimpleBuy);
+            ExchangeOrderResult order = polo.GetOrderDetailsAsync("1").Sync();
 
             order.OrderId.Should().Be("1");
             order.Amount.Should().Be(19096.46996880m);
@@ -249,27 +250,27 @@ namespace ExchangeSharpTests
         [TestMethod]
         public void GetOrderDetails_OrderNotFound_DoesNotThrow()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(@"{""error"":""Order not found, or you are not the person who placed it.""}");
-            polo.GetOrderDetails("1").Should().BeNull();
+            const string response = @"{""error"":""Order not found, or you are not the person who placed it.""}";
+            var polo = CreatePoloniexAPI(response);
+            void a() => polo.GetOrderDetailsAsync("1").Sync();
+            Invoking(a).Should().Throw<APIException>();
         }
 
         [TestMethod]
         public void GetOrderDetails_OtherErrors_ThrowAPIException()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(@"{""error"":""Big scary error.""}");
+            const string response = @"{""error"":""Big scary error.""}";
+            var polo = CreatePoloniexAPI(response);
 
-            void a() => polo.GetOrderDetails("1");
+            void a() => polo.GetOrderDetailsAsync("1").Sync();
             Invoking(a).Should().Throw<APIException>();
         }
 
         [TestMethod]
         public void GetCompletedOrderDetails_MultipleOrders()
         {
-            var polo = CreateAPI();
-            polo.RequestMaker.MakeRequestAsync(null).ReturnsForAnyArgs(ReturnOrderTrades_AllGas);
-            IEnumerable<ExchangeOrderResult> orders = polo.GetCompletedOrderDetails("ETH_GAS");
+            var polo = CreatePoloniexAPI(ReturnOrderTrades_AllGas);
+            IEnumerable<ExchangeOrderResult> orders = polo.GetCompletedOrderDetailsAsync("ETH_GAS").Sync();
             orders.Should().HaveCount(2);
             ExchangeOrderResult sellorder = orders.Single(x => !x.IsBuy);
             sellorder.AveragePrice.Should().Be(0.04123m);
@@ -284,6 +285,60 @@ namespace ExchangeSharpTests
             buyOrder.FeesCurrency.Should().Be("GAS");
             buyOrder.Fees.Should().Be(0.0352725m);
             buyOrder.Result.Should().Be(ExchangeAPIOrderResult.Filled);
+        }
+
+        [TestMethod]
+        public void GetCompletedOrderDetails_AllSymbols()
+        {
+            // {"BTC_MAID": [ { "globalTradeID": 29251512, "tradeID": "1385888", "date": "2016-05-03 01:29:55", "rate": "0.00014243", "amount": "353.74692925", "total": "0.05038417", "fee": "0.00200000", "orderNumber": "12603322113", "type": "buy", "category": "settlement" }, { "globalTradeID": 29251511, "tradeID": "1385887", "date": "2016-05-03 01:29:55", "rate": "0.00014111", "amount": "311.24262497", "total": "0.04391944", "fee": "0.00200000", "orderNumber": "12603319116", "type": "sell", "category": "marginTrade" }
+            var polo = CreatePoloniexAPI(GetCompletedOrderDetails_AllSymbolsOrders);
+            ExchangeOrderResult order = polo.GetCompletedOrderDetailsAsync().Sync().First();
+            order.Symbol.Should().Be("BTC_MAID");
+            order.OrderId.Should().Be("12603322113");
+            order.OrderDate.Should().Be(new DateTime(2016, 5, 3, 1, 29, 55));
+            order.AveragePrice.Should().Be(0.00014243m);
+            order.Price.Should().Be(0.00014243m);
+            order.Amount.Should().Be(353.74692925m);
+            order.Fees.Should().Be(0.70749386m);
+            order.IsBuy.Should().Be(true);
+        }
+
+        [TestMethod]
+        public void OnGetDepositHistory_DoesNotFailOnMinTimestamp()
+        {
+            var polo = CreatePoloniexAPI(null);
+            Invoking(() => polo.GetDepositHistoryAsync("doesntmatter").Sync()).Should().Throw<APIException>().And.Message.Should().Contain("No result");
+        }
+
+        [TestMethod]
+        public void GetExchangeMarketFromCache_SymbolsMetadataCacheRefreshesWhenSymbolNotFound()
+        {
+            var polo = CreatePoloniexAPI(Resources.PoloniexGetSymbolsMetadata1);
+            int requestCount = 0;
+            polo.RequestMaker.RequestStateChanged = (r, s, o) =>
+            {
+                if (s == RequestMakerState.Begin)
+                {
+                    requestCount++;
+                }
+            };
+
+            // retrieve without BTC_BCH in the result
+            polo.GetExchangeMarketFromCacheAsync("XMR_LTC").Sync().Should().NotBeNull();
+            requestCount.Should().Be(1);
+            polo.GetExchangeMarketFromCacheAsync("BTC_BCH").Sync().Should().BeNull();
+            requestCount.Should().Be(2);
+
+            // now many moons later we request BTC_BCH, which wasn't in the first request but is in the latest exchange result
+            (polo.RequestMaker as MockAPIRequestMaker).GlobalResponse = Resources.PoloniexGetSymbolsMetadata2;
+            polo.GetExchangeMarketFromCacheAsync("BTC_BCH").Sync().Should().NotBeNull();
+            requestCount.Should().Be(3);
+
+            // and lets make sure it doesn't return something for null and garbage symbols
+            polo.GetExchangeMarketFromCacheAsync(null).Sync().Should().BeNull();
+            polo.GetExchangeMarketFromCacheAsync(string.Empty).Sync().Should().BeNull();
+            polo.GetExchangeMarketFromCacheAsync("324235!@^%Q@#%^").Sync().Should().BeNull();
+            polo.GetExchangeMarketFromCacheAsync("NOCOIN_NORESULT").Sync().Should().BeNull();
         }
 
         private static Action Invoking(Action action) => action;
@@ -867,6 +922,12 @@ namespace ExchangeSharpTests
 }]";
 
         #endregion
+
+        #region GetCompletedOrderDetails_AllSymbols
+
+        private const string GetCompletedOrderDetails_AllSymbolsOrders = @"{""BTC_MAID"": [ { ""globalTradeID"": 29251512, ""tradeID"": ""1385888"", ""date"": ""2016-05-03 01:29:55"", ""rate"": ""0.00014243"", ""amount"": ""353.74692925"", ""total"": ""0.05038417"", ""fee"": ""0.00200000"", ""orderNumber"": ""12603322113"", ""type"": ""buy"", ""category"": ""settlement"" }, { ""globalTradeID"": 29251511, ""tradeID"": ""1385887"", ""date"": ""2016-05-03 01:29:55"", ""rate"": ""0.00014111"", ""amount"": ""311.24262497"", ""total"": ""0.04391944"", ""fee"": ""0.00200000"", ""orderNumber"": ""12603319116"", ""type"": ""sell"", ""category"": ""marginTrade"" }";
+
+        #endregion GetCompletedOrderDetails_AllSymbols
 
         private const string Unfilled = @"[{
     ""orderNumber"": ""35329211614"",

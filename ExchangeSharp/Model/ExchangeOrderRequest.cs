@@ -10,6 +10,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
 
 namespace ExchangeSharp
@@ -18,7 +19,7 @@ namespace ExchangeSharp
     /// Order request details
     /// </summary>
     [System.Serializable]
-    public sealed class ExchangeOrderRequest
+    public class ExchangeOrderRequest
     {
         /// <summary>
         /// Symbol or pair for the order, i.e. btcusd
@@ -36,9 +37,22 @@ namespace ExchangeSharp
         public decimal Price { get; set; }
 
         /// <summary>
+        /// The price to trigger a stop
+        /// </summary>
+        public decimal StopPrice { get; set; }
+    
+        /// <summary>
         /// True if this is a buy, false if a sell
         /// </summary>
         public bool IsBuy { get; set; }
+
+        /// <summary>
+        /// Whether the order is a margin order. Not all exchanges support margin orders, so this parameter may be ignored.
+        /// You should verify that your exchange supports margin orders before passing this field as true and expecting
+        /// it to be a margin order. The best way to determine this in code is to call one of the margin account balance
+        /// methods and see if it fails.
+        /// </summary>
+        public bool IsMargin { get; set; }
 
         /// <summary>
         /// Whether the amount should be rounded - set to false if you know the exact amount, otherwise leave
@@ -56,7 +70,7 @@ namespace ExchangeSharp
         /// Not all exchanges will use this dictionary.
         /// These are added after all other parameters and will replace existing properties, such as order type.
         /// </summary>
-        public Dictionary<string, object> ExtraParameters { get; private set; } = new Dictionary<string, object>();
+        public Dictionary<string, object> ExtraParameters { get; private set; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Return a rounded amount if needed
@@ -67,4 +81,26 @@ namespace ExchangeSharp
             return ShouldRoundAmount ? CryptoUtility.RoundAmount(Amount) : Amount;
         }
     }
+
+    /// <summary>
+    /// The type of order - default is limit. Please use market orders with caution. Not all exchanges support market orders.
+    /// Types of orders
+    /// </summary>
+    public enum OrderType
+    {
+        /// <summary>
+        /// A limit order, the order will not buy or sell beyond the price you specify
+        /// </summary>
+        Limit,
+
+        /// <summary>
+        /// A market order, you will buy or sell the full amount - use with caution as this will give you a terrible deal if the order book is thin
+        /// </summary>
+        Market,
+
+        /// <summary>
+        /// A stop order, you will sell if price reaches a low enough level down to a limit
+        /// </summary>
+        Stop
+  }
 }
